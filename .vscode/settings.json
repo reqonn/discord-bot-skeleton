@@ -1,0 +1,43 @@
+{
+  // Use the TypeScript this project depends on, not the one VS Code ships.
+  // Without this the editor and `pnpm typecheck` can disagree — the editor
+  // shows errors that do not exist, or misses ones that do.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // Collapses config files under package.json in the explorer. Everything is
+  // still there and still at the root where the tools expect it; it just stops
+  // being the first thing you see.
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "package.json": "pnpm-lock.yaml, pnpm-workspace.yaml, tsconfig*.json, eslint.config.js, .prettierignore, .editorconfig, .nvmrc, vitest.config.ts, .dependency-cruiser.cjs, docker-compose.yml, .gitattributes, .gitignore",
+    ".env.example": ".env, .env.*",
+    "README.md": "LICENSE*, CHANGELOG*"
+  },
+
+  // VS Code only downloads JSON schemas from an allow-list of domains. Without
+  // this, the "$schema" in railway.json fails to resolve and the editor loses
+  // validation and completion for it. Railway itself ignores the field, so this
+  // is purely an editor concern.
+  "json.schemaDownload.trustedDomains": {
+    "https://railway.com/": true
+  },
+
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // Import paths use the .js extension even in TypeScript source — this is
+  // native ESM, and the extension is part of the specifier.
+  "js/ts.preferences.importModuleSpecifierEnding": "js",
+
+  "search.exclude": {
+    "**/dist": true,
+    "**/coverage": true,
+    "**/.devdb": true,
+    "**/pnpm-lock.yaml": true
+  }
+}

@@ -1,0 +1,9 @@
+# src/features/user/
+#
+# Per-person features: profile, reminders, fun, preferences.
+# Scoped to a user wherever they are, so they work in a DM as well as a server.
+#
+# Create a feature here with:
+#   pnpm new:feature user <name>
+#
+# Delete this file once the group holds a real feature.

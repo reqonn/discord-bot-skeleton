@@ -1,0 +1,15 @@
+{
+  // Production build: compiles src/ only. Tests live in tests/ and scripts run
+  // through tsx, so neither is shipped — `pnpm typecheck` still checks both.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

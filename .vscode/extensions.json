@@ -1,0 +1,19 @@
+{
+  // Surfaced as "Install recommended extensions" when the folder is opened.
+  // Kept to what genuinely helps *this* codebase — a long list trains people to
+  // dismiss the prompt. Optional extras are listed in the README instead.
+  "recommendations": [
+    // Half the architecture harness. Without it you find violations at CI
+    // instead of as you type.
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+
+    // Puts lint and type errors on the line itself. With this many rules, you
+    // want them where you are typing rather than in a panel you have to open.
+    "usernamehw.errorlens",
+
+    // Strict TypeScript produces long structural errors. This makes them
+    // readable, which matters most in the places the types are doing real work.
+    "yoavbls.pretty-ts-errors"
+  ]
+}

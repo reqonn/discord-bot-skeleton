@@ -1,0 +1,9 @@
+# src/features/guild/
+#
+# Per-server features: settings, tickets, moderation, welcome, logging.
+# Anything that reads or writes guild state, and almost always declares inGuild().
+#
+# Create a feature here with:
+#   pnpm new:feature guild <name>
+#
+# Delete this file once the group holds a real feature.

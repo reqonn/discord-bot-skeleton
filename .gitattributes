@@ -1,0 +1,14 @@
+# Normalise line endings so a Windows and a Linux contributor produce identical
+# diffs. Matches .editorconfig and Prettier's endOfLine setting.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+pnpm-lock.yaml linguist-generated=true
+database/schema.sql linguist-generated=true

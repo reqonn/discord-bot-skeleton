@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Integration tests run against the postgres service below. Unit, application,
+  # and adapter tests need no services at all — that is the point of the ports.
+  DATABASE_URL: postgres://bot:bot@127.0.0.1:55432/bot
+  # Present only in CI. Its absence locally is what keeps development honest;
+  # its presence here is what proves the production path works.
+  REDIS_URL: redis://127.0.0.1:56379
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bot
+          POSTGRES_PASSWORD: bot
+          POSTGRES_DB: bot
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U bot -d bot"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      # Development runs without Redis by design, which makes the Redis-backed
+      # cache and lock the least-exercised code in the repository — and the only
+      # code a production deploy runs first. CI is where they get executed.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # These are exactly the checks `pnpm verify` runs, listed separately so a
+      # single CI run reports every problem rather than stopping at the first.
+      # If you add a check to one side, add it to the other.
+      - name: Typecheck
+        id: typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: pnpm lint
+
+      - name: Format
+        if: ${{ !cancelled() }}
+        run: pnpm format:check
+
+      - name: Architecture rules
+        if: ${{ !cancelled() }}
+        run: pnpm arch
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: pnpm test
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: pnpm build

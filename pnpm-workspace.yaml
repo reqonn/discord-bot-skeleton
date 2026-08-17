@@ -1,0 +1,17 @@
+# Build scripts pnpm is allowed to run on install.
+#
+# Every platform variant of embedded-postgres is listed, not just the one this
+# machine needs. pnpm errors on an unapproved build script, so approving only
+# the local platform breaks CI and every contributor on a different OS — which
+# is exactly what happened on the first CI run.
+allowBuilds:
+  "@embedded-postgres/darwin-arm64": true
+  "@embedded-postgres/darwin-x64": true
+  "@embedded-postgres/linux-arm": true
+  "@embedded-postgres/linux-arm64": true
+  "@embedded-postgres/linux-ia32": true
+  "@embedded-postgres/linux-ppc64": true
+  "@embedded-postgres/linux-x64": true
+  "@embedded-postgres/windows-x64": true
+  esbuild: true
+  unrs-resolver: true

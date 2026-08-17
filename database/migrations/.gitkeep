@@ -1,0 +1,18 @@
+# database/migrations/
+#
+# Versioned SQL, applied automatically at startup under a Postgres advisory
+# lock so a rolling deploy is safe.
+#
+# Create one with:
+#   pnpm db:migrate:new create-tickets
+#
+# Naming: NNNN_verb-noun.up.sql, with an optional matching .down.sql.
+# The sequence must be contiguous and start at 0001 — the loader refuses a gap,
+# because a gap usually means two branches each added a migration and one will
+# apply out of order on a database that has already seen the other.
+#
+# Never edit a migration that has been applied. Checksums are recorded, and a
+# changed file is a startup failure rather than a schema that silently differs
+# between environments.
+#
+# Delete this file once real migrations exist.

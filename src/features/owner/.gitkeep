@@ -1,0 +1,9 @@
+# src/features/owner/
+#
+# Bot-owner only: diagnostics, administration, maintenance.
+# Never exposed to ordinary users — these declare an owner-only policy.
+#
+# Create a feature here with:
+#   pnpm new:feature owner <name>
+#
+# Delete this file once the group holds a real feature.

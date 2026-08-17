@@ -1,0 +1,104 @@
+{
+  "name": "discord-bot-skeleton",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Discord bot skeleton \u2014 Node.js, TypeScript, discord.js \u2014 on a feature-sliced hexagonal architecture",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "imports": {
+    "#app/*": {
+      "development": "./src/app/*",
+      "default": "./dist/app/*"
+    },
+    "#platform/*": {
+      "development": "./src/platform/*",
+      "default": "./dist/platform/*"
+    },
+    "#discord/*": {
+      "development": "./src/discord/*",
+      "default": "./dist/discord/*"
+    },
+    "#features/*": {
+      "development": "./src/features/*",
+      "default": "./dist/features/*"
+    },
+    "#shared/*": {
+      "development": "./src/shared/*",
+      "default": "./dist/shared/*"
+    },
+    "#testing/*": "./tests/support/*"
+  },
+  "scripts": {
+    "setup": "tsx --conditions=development scripts/setup.ts",
+    "dev": "tsx watch --conditions=development --env-file-if-exists=.env src/main.ts",
+    "stop": "tsx --conditions=development scripts/stop.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm arch && pnpm test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "arch": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check": "tsx --conditions=development --env-file-if-exists=.env scripts/check.ts",
+    "db:start": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts start",
+    "db:stop": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts stop",
+    "db:reset": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts reset",
+    "db:migrate": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts up",
+    "db:migrate:new": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts new",
+    "db:migrate:status": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts status",
+    "db:migrate:down": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts down",
+    "commands:deploy": "tsx --conditions=development --env-file-if-exists=.env scripts/deploy-commands.ts",
+    "commands:clear": "tsx --conditions=development --env-file-if-exists=.env scripts/clear-commands.ts",
+    "new:feature": "tsx --conditions=development --env-file-if-exists=.env scripts/new-feature.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "undici": "^8.10.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.21.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "dependency-cruiser": "^18.2.0",
+    "dotenv": "^17.4.2",
+    "embedded-postgres": "18.4.0-beta.17",
+    "eslint": "^10.8.1",
+    "eslint-plugin-check-file": "^3.3.2",
+    "eslint-plugin-import-x": "^4.17.1",
+    "pino-pretty": "^13.1.3",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": false,
+    "semi": true,
+    "trailingComma": "all",
+    "arrowParens": "always",
+    "endOfLine": "lf",
+    "overrides": [
+      {
+        "files": "*.md",
+        "options": {
+          "proseWrap": "preserve"
+        }
+      }
+    ]
+  }
+}
