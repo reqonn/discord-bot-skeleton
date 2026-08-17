@@ -107,9 +107,11 @@ a failure into a busy channel by forgetting.
 
 ### Decision 3 — environment differences are resolved by wiring
 
-Redis in production, no Redis in development, is a **composition** concern.
-`src/app/wiring.ts` decides which implementation of `Cache` and `Lock` to
-construct. Not one line of feature code knows the difference.
+Redis or no Redis is a **composition** concern. `src/app/wiring.ts` decides
+which implementation of `Cache` and `Lock` to construct, on one input —
+whether `REDIS_URL` is set. Not one line of feature code knows the difference,
+which is also why running Redis locally needs no code change at all: set the
+variable and the same classes production runs are the ones you are running.
 
 Grep for `redis.enabled` outside `platform/config/` and `app/wiring.ts` and you
 will find nothing. The consequence: **development exercises the same code paths
@@ -770,16 +772,23 @@ what turns it on for local development. When the intent is missing,
 
 ## 10. Development mode
 
-Development runs **without Redis**, on purpose.
+Development runs **without Redis** by default, on purpose.
 
-|              | Development           | Production                         |
-| ------------ | --------------------- | ---------------------------------- |
-| Cache        | `MemoryCache`         | `TieredCache` (memory + Redis)     |
-| Locks        | `LocalLock`           | `RedisLock` (lease + stop-on-loss) |
-| Redis        | not required          | optional — see below               |
-| Commands     | guild-scoped, instant | global                             |
-| Logs         | pretty, `debug`       | JSON, `info`                       |
-| Error detail | shown                 | hidden                             |
+Two different axes get confused here, so they are worth separating. Cache and
+lock implementations are chosen by **whether `REDIS_URL` is set**, not by the
+environment — development with Redis and production with Redis run exactly the
+same classes. Everything else below is chosen by the environment.
+
+|       | `REDIS_URL` blank | `REDIS_URL` set                    |
+| ----- | ----------------- | ---------------------------------- |
+| Cache | `MemoryCache`     | `TieredCache` (memory + Redis)     |
+| Locks | `LocalLock`       | `RedisLock` (lease + stop-on-loss) |
+
+|              | Development           | Production   |
+| ------------ | --------------------- | ------------ |
+| Commands     | guild-scoped, instant | global       |
+| Logs         | pretty, `debug`       | JSON, `info` |
+| Error detail | shown                 | hidden       |
 
 Documented degradations, printed at startup: caches are per-process and lost on
 restart; singleton jobs use a process-local mutex and are unsafe with more than
@@ -801,6 +810,27 @@ pnpm dev
 
 `docker compose up -d postgres` is equivalent; both listen on 55432 with the
 same credentials, so `DATABASE_URL` never changes between them.
+
+### Running with Redis locally
+
+Worth doing before a deploy that raises the replica count, because the
+Redis-backed cache and lock are otherwise the least-exercised code here — and
+the first thing a multi-instance deploy runs.
+
+```bash
+pnpm redis:start       # prints the URL; paste it into .env
+pnpm dev               # TieredCache and RedisLock now, same as production
+pnpm redis:stop
+```
+
+Unlike `pnpm db:start`, this one needs **Docker**. There is no maintained
+equivalent of `embedded-postgres` for Redis — no package ships binaries for
+every platform, and Redis has no official Windows build — so the script says
+that plainly rather than failing obscurely. `docker compose up -d redis` is
+equivalent: same image, same container name, same port.
+
+Blank `REDIS_URL` again and you are back to in-process caching. Nothing else
+changes, because nothing else knows.
 
 ---
 

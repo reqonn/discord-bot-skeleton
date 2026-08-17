@@ -140,6 +140,7 @@ they exist for when you want a single check to be fast.
 | `pnpm test` / `pnpm test:watch` / `pnpm test:coverage` | Vitest                                                                |
 | `pnpm check`                                           | What is missing from your setup                                       |
 | `pnpm db:start` / `pnpm db:stop`                       | Start / stop the local PostgreSQL                                     |
+| `pnpm redis:start` / `pnpm redis:stop`                 | Start / stop a local Redis. Optional — needs Docker                   |
 | `pnpm db:migrate:status` / `pnpm db:migrate:down`      | Inspect / roll back migrations                                        |
 | `pnpm commands:clear`                                  | Remove every registered command                                       |
 | `pnpm build` / `pnpm start`                            | Compile to `dist/` / run the build. Railway runs these; you rarely do |

@@ -51,6 +51,8 @@
     "db:start": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts start",
     "db:stop": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts stop",
     "db:reset": "tsx --conditions=development --env-file-if-exists=.env scripts/dev-database.ts reset",
+    "redis:start": "tsx --conditions=development scripts/dev-redis.ts start",
+    "redis:stop": "tsx --conditions=development scripts/dev-redis.ts stop",
     "db:migrate": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts up",
     "db:migrate:new": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts new",
     "db:migrate:status": "tsx --conditions=development --env-file-if-exists=.env scripts/migrate.ts status",
