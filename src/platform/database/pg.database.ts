@@ -50,6 +50,23 @@ export class PgDatabase implements Database {
       // Applied per connection by the driver, so every statement inherits it
       // without repeating the setting at call sites.
       statement_timeout: config.database.statementTimeoutMs,
+      // A transaction left open holds its locks and pins a connection. Bounded
+      // well above the statement timeout, because the limit being guarded here
+      // is a client that stopped issuing statements rather than one running a
+      // slow one.
+      idle_in_transaction_session_timeout: config.database.statementTimeoutMs * 5,
+      // A bot is bursty. A pool sized for the burst should not hold that many
+      // sockets open through the quiet hours.
+      idleTimeoutMillis: 30_000,
+      // Without this, a pool waiting on an unreachable server never settles and
+      // the caller's own deadline is the only thing that ends it.
+      connectionTimeoutMillis: 10_000,
+      // Long-lived idle connections are dropped silently by NAT gateways and
+      // load balancers; the next query on one fails for no visible reason.
+      keepAlive: true,
+      // Recycled periodically, so a connection cannot accumulate server-side
+      // state or sit on a stale backend after a failover.
+      maxUses: 7_500,
     });
 
     // An idle-client error (a server restart, a dropped connection) is emitted

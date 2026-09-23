@@ -147,7 +147,7 @@ export class InfrastructureError extends AppError {
       ...options,
       code: options.code ?? ErrorCodes.INFRASTRUCTURE_FAILURE,
       severity: "unexpected",
-      userMessage: "Something went wrong on our side. Please try again shortly.",
+      userMessage: "Something went wrong on our side.",
       detail,
     });
   }
@@ -173,7 +173,7 @@ export class DiscordError extends AppError {
       ...options,
       code: options.code ?? ErrorCodes.DISCORD_API_FAILURE,
       severity: "unexpected",
-      userMessage: "Discord did not accept that action. Please try again shortly.",
+      userMessage: "Discord did not accept that action.",
       detail,
     });
   }
@@ -189,7 +189,7 @@ export class InternalError extends AppError {
       ...options,
       code: options.code ?? ErrorCodes.INTERNAL,
       severity: "unexpected",
-      userMessage: "Something went wrong. Please try again.",
+      userMessage: "Something went wrong.",
       detail,
     });
   }

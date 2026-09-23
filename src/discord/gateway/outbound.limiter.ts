@@ -1,4 +1,4 @@
-import type { Logger } from "../../platform/logging/logger.contract.js";
+import { detach, type Logger } from "../../platform/logging/logger.contract.js";
 import { Metric } from "../../platform/metrics/metrics.catalog.js";
 import type { Metrics } from "../../platform/metrics/metrics.contract.js";
 import { DiscordError, type AppError } from "../../shared/errors/app-error.js";
@@ -255,6 +255,10 @@ export class OutboundLimiter {
   ): Promise<Result<T, AppError>> {
     if (this.depthOf(lane) >= this.settings.queueMaxPerGuild && !this.evictLower(lane, request)) {
       this.record(request.feature, "dropped");
+      // This ends without calling Discord, and only an execution can clear a
+      // half-open circuit. Without giving the slot back, a drop while probing
+      // leaves the circuit refusing everything for ever. See `releaseProbe`.
+      this.breaker.releaseProbe(key);
       return Promise.resolve(
         err(new DiscordError(`Outbound queue full for ${laneKey}; dropped ${request.feature}.`)),
       );
@@ -267,10 +271,19 @@ export class OutboundLimiter {
         feature: request.feature,
         expiresAt: this.now() + this.settings.queueTimeoutMs,
         start: () => {
-          void this.execute(request, laneKey, key, "queued").then(resolve);
+          detach(
+            this.execute(request, laneKey, key, "queued").then(resolve),
+            this.logger,
+            "Queued Discord action failed",
+            { feature: request.feature },
+          );
         },
         abandon: (outcome) => {
           this.record(request.feature, outcome);
+          // Evicted, timed out, or dropped at shutdown: all three end without
+          // calling Discord, so a probe admitted for this action has to go
+          // back or the circuit stays half-open for ever.
+          this.breaker.releaseProbe(key);
           resolve(err(new DiscordError(`Outbound action ${outcome}: ${request.feature}.`)));
         },
       });

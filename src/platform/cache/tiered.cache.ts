@@ -23,12 +23,27 @@ export class TieredCache implements Cache {
   ) {}
 
   async get<T>(namespace: CacheNamespace, id: string): Promise<T | undefined> {
+    // Marked before either tier is asked, for the reason `MemoryCache.getOrLoad`
+    // marks before its load: the shared tier is a round trip, and an
+    // invalidation can land while it is answering.
+    const mark = this.l1.markLoad(namespace, id);
+
     const local = await this.l1.get<T>(namespace, id);
     if (local !== undefined) return local;
 
     const shared = await this.l2.get<T>(namespace, id);
-    // Promote, so the next read on this instance costs nothing.
-    if (shared !== undefined) await this.l1.set(namespace, id, shared);
+
+    // Promoted so the next read on this instance costs nothing — unless
+    // something invalidated the key meanwhile, in which case promoting would
+    // put back into L1 exactly what the invalidation took out of it, and leave
+    // it there for the full TTL. This is the one place that wrote to a tier
+    // without the guard `getOrLoad` already applies to its own write.
+    if (shared !== undefined && this.l1.isCurrent(namespace, id, mark)) {
+      await this.l1.set(namespace, id, shared);
+    }
+
+    // Returned to the caller either way. They asked before the change, and it
+    // is only the *caching* of the answer that is refused.
     return shared;
   }
 

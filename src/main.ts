@@ -35,7 +35,7 @@ function installSignalHandlers(app: Application): void {
 
   for (const signal of signals) {
     process.on(signal, () => {
-      void stopAndExit(app, signal);
+      stopFor(app, signal);
     });
   }
 
@@ -44,7 +44,7 @@ function installSignalHandlers(app: Application): void {
   // process sits. Only arms for a real terminal — see hangup.ts for why that
   // guard is load-bearing.
   const armed = onTerminalHangup(process.stdin, () => {
-    void stopAndExit(app, "terminal-closed");
+    stopFor(app, "terminal-closed");
   });
 
   app.logger.debug("Shutdown signals installed", {
@@ -59,12 +59,30 @@ function installCrashHandlers(app: Application): void {
   // continuing to serve interactions from a process we cannot reason about.
   process.on("unhandledRejection", (reason) => {
     app.logger.fatal("Unhandled promise rejection", { error: reason });
-    void stopAndExit(app, "unhandledRejection", FATAL_EXIT_CODE);
+    stopFor(app, "unhandledRejection", FATAL_EXIT_CODE);
   });
 
   process.on("uncaughtException", (error) => {
     app.logger.fatal("Uncaught exception", { error });
-    void stopAndExit(app, "uncaughtException", FATAL_EXIT_CODE);
+    stopFor(app, "uncaughtException", FATAL_EXIT_CODE);
+  });
+}
+
+/**
+ * Starts a shutdown and makes sure the process ends either way.
+ *
+ * Not `detach`: that logs a failure and lets the process carry on, and here
+ * carrying on is the one thing that must not happen — a signal was received.
+ * A teardown that throws still has to exit, and with a failing code, or a
+ * restart-on-failure policy reads the crash as a clean stop and leaves the bot
+ * down.
+ */
+function stopFor(app: Application, reason: string, code = 0): void {
+  stopAndExit(app, reason, code).catch((error: unknown) => {
+    process.stderr.write(`
+Shutdown failed: ${String(error)}
+`);
+    process.exit(FATAL_EXIT_CODE);
   });
 }
 

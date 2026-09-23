@@ -113,6 +113,38 @@ describe("CircuitBreaker", () => {
       advance(5_000);
       expect(b.state(KEY)).toBe("half-open");
     });
+
+    it("recovers when an admitted probe is never executed", () => {
+      // `allows` marks the circuit as probing so only one call goes through
+      // while half-open, and recordSuccess/recordFailure are what clear it. A
+      // probe admitted and then *not executed* — dropped by a full queue, or
+      // abandoned after waiting — reports neither, so the flag stays set and
+      // every later call is refused however long the cooldown has passed. The
+      // circuit never recovers, for that guild and feature, until the process
+      // restarts.
+      const { breaker: b, advance } = breaker(3, 1_000, 5_000);
+      for (let i = 0; i < 3; i += 1) b.recordFailure(KEY);
+      advance(5_000);
+
+      expect(b.allows(KEY)).toBe(true);
+      b.releaseProbe(KEY);
+
+      expect(b.allows(KEY)).toBe(true);
+    });
+
+    it("does not treat an unused probe as evidence of anything", () => {
+      // Nothing called Discord, so there is no evidence about whether the
+      // dependency is healthy. Recording a failure would restart the cooldown
+      // on the strength of our own queue being busy.
+      const { breaker: b, advance } = breaker(3, 1_000, 5_000);
+      for (let i = 0; i < 3; i += 1) b.recordFailure(KEY);
+      advance(5_000);
+
+      b.allows(KEY);
+      b.releaseProbe(KEY);
+
+      expect(b.state(KEY)).toBe("half-open");
+    });
   });
 
   it("counts open circuits for the metrics gauge", () => {

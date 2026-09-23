@@ -35,6 +35,11 @@ function action<T>(
   };
 }
 
+/** Real elapsed time, for the paths driven by the drain timer. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** A promise you resolve by hand, for controlling in-flight work. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -337,6 +342,50 @@ describe("OutboundLimiter", () => {
       );
 
       expect(critical).toEqual({ ok: true, value: "moderation" });
+    });
+
+    it("recovers after a probe the queue abandoned instead of running", async () => {
+      // The circuit admits one probe after its cooldown, and only an execution
+      // reports back. A probe that is admitted and then never executed —
+      // queued behind a busy lane and abandoned when it timed out — reports
+      // neither success nor failure, so the slot stayed taken and every later
+      // call was refused for the life of the process. A guild whose lane was
+      // briefly busy never sent again.
+      const { limiter: l } = limiter({
+        circuitFailureThreshold: 1,
+        circuitCooldownMs: 10,
+        concurrencyPerGuild: 1,
+        queueTimeoutMs: 10,
+        drainIntervalMs: 5,
+      });
+      l.start();
+
+      await l.run(action(() => Promise.reject(new Error("down"))));
+      await sleep(20); // past the cooldown, so the circuit is half-open
+
+      // Critical work bypasses the breaker entirely, so it occupies the lane
+      // without taking the probe slot. A different feature, because a circuit
+      // is keyed by guild *and* feature — succeeding under the same one would
+      // close the circuit outright and prove nothing about the probe.
+      const blocker = deferred<string>();
+      const running = l.run(
+        action(() => blocker.promise, {
+          priority: ActionPriority.Critical,
+          feature: "welcome",
+        }),
+      );
+
+      // This one takes the probe, finds the lane busy, waits, and is abandoned.
+      const abandonedProbe = await l.run(action(() => Promise.resolve("probe")));
+      expect(abandonedProbe.ok).toBe(false);
+
+      blocker.resolve("done");
+      await running;
+
+      // The dependency may well be healthy now. The next call has to be
+      // allowed to find that out.
+      const recovered = await l.run(action(() => Promise.resolve("sent")));
+      expect(recovered).toEqual({ ok: true, value: "sent" });
     });
 
     it("reports open circuits for the gauge", async () => {

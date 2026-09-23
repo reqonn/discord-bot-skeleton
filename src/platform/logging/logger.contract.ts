@@ -1,3 +1,5 @@
+import { isAppError } from "../../shared/errors/app-error.js";
+
 /**
  * The logging port.
  *
@@ -38,3 +40,33 @@ export type ErrorLogFields = LogFields & {
   /** Serialised with its message, stack, and cause chain. */
   readonly error?: unknown;
 };
+
+/**
+ * Lets work run without waiting for it, and says so when it fails.
+ *
+ * `void work` looks like it lets go of a promise. What it lets go of is the
+ * *failure*: a rejection nobody handles reaches `unhandledRejection`, and
+ * src/main.ts treats that as fatal — so one background notification Discord
+ * refused, or one job tick whose lease Redis could not grant, takes the whole
+ * process down for every guild it serves.
+ *
+ * Every piece of work nobody waits on goes through here, rather than each call
+ * site inventing its own `.catch`. `what` names the work for whoever reads the
+ * log: "Could not send the welcome message" answers the question a bare stack
+ * trace does not.
+ *
+ * An expected failure is logged at warn and anything else at error — the same
+ * split the pipeline makes for work somebody did wait on, so the error level
+ * keeps meaning the same thing everywhere.
+ */
+export function detach(
+  work: Promise<unknown>,
+  logger: Logger,
+  what: string,
+  fields?: LogFields,
+): void {
+  void work.catch((error: unknown) => {
+    const expected = isAppError(error) && error.severity === "expected";
+    logger[expected ? "warn" : "error"](what, { ...fields, error });
+  });
+}

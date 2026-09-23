@@ -160,6 +160,67 @@ describe("JobScheduler", () => {
     });
   });
 
+  describe("overlapping runs", () => {
+    it("skips a tick while the previous run is still going", async () => {
+      // A job that takes longer than its interval should run less often, not
+      // accumulate copies of itself. Without this guard every tick starts
+      // another run, each one slower than the interval, and the overlap grows
+      // without bound until the process runs out of whatever the job holds.
+      const { jobs } = scheduler();
+      let started = 0;
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      jobs.register(
+        job({
+          id: "test.slow",
+          everyMs: 5,
+          singleton: false,
+          run: async () => {
+            started += 1;
+            await blocked;
+          },
+        }),
+      );
+
+      jobs.start();
+      await new Promise((tick) => setTimeout(tick, 40));
+      jobs.stop();
+
+      // Eight ticks would have fired in that window. Exactly one run may be
+      // under way.
+      expect(started).toBe(1);
+
+      release();
+    });
+
+    it("runs again on a later tick once the previous run has finished", async () => {
+      // The guard must skip a tick, not stop the schedule.
+      const { jobs } = scheduler();
+      let started = 0;
+
+      jobs.register(
+        job({
+          id: "test.quick",
+          everyMs: 5,
+          singleton: false,
+          run: () => {
+            started += 1;
+            return Promise.resolve();
+          },
+        }),
+      );
+
+      jobs.start();
+      await new Promise((tick) => setTimeout(tick, 40));
+      jobs.stop();
+
+      expect(started).toBeGreaterThan(1);
+    });
+  });
+
   describe("metrics and history", () => {
     it("counts every run by outcome", async () => {
       const { jobs, metrics } = scheduler();

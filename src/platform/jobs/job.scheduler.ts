@@ -1,6 +1,6 @@
 import { createRequestContext, runWithRequestContext } from "../context/request-context.js";
 import type { Lock } from "../locks/lock.contract.js";
-import type { Logger } from "../logging/logger.contract.js";
+import { detach, type Logger } from "../logging/logger.contract.js";
 import { Metric } from "../metrics/metrics.catalog.js";
 import type { Metrics } from "../metrics/metrics.contract.js";
 
@@ -37,6 +37,16 @@ export class JobScheduler {
   private readonly history: JobRun[] = [];
   private readonly logger: Logger;
   private running = false;
+  /**
+   * Job ids with a run under way.
+   *
+   * A job that takes longer than its interval must run *less often*, not
+   * accumulate copies of itself. Without this, every tick started another run
+   * and the overlap grew without bound — a singleton was covered by its lease
+   * failing to be granted, but a non-singleton job had nothing stopping it at
+   * all.
+   */
+  private readonly inProgress = new Set<string>();
 
   constructor(
     logger: Logger,
@@ -61,7 +71,7 @@ export class JobScheduler {
     for (const job of this.jobs) {
       const begin = (): void => {
         const timer = setInterval(() => {
-          void this.execute(job);
+          detach(this.execute(job), this.logger, "Job tick failed", { job: job.id });
         }, job.everyMs);
         timer.unref();
         this.timers.set(job.id, timer);
@@ -83,6 +93,9 @@ export class JobScheduler {
     for (const timer of this.timers.values()) clearTimeout(timer);
     this.timers.clear();
     this.running = false;
+    // Deliberately not clearing `inProgress`: a run still in flight keeps its
+    // guard across a stop, so a restart cannot start a second copy beside it.
+    // The `finally` in `execute` is what releases an id, always.
   }
 
   /** The most recent runs, newest last. Surfaced by diagnostics. */
@@ -90,9 +103,22 @@ export class JobScheduler {
     return this.history;
   }
 
-  /** Runs a job once, immediately. Exposed for tests and manual triggering. */
+  /**
+   * Runs a job once, immediately. Exposed for tests and manual triggering.
+   *
+   * A call made while the same job is already running is skipped rather than
+   * queued: running it twice over is not what "it is due again" means, and
+   * queueing would turn a slow job into a backlog that never drains.
+   */
   async execute(job: Job): Promise<JobRun> {
     const startedAt = Date.now();
+
+    if (this.inProgress.has(job.id)) {
+      this.logger.debug("Skipped a job tick — the previous run is still going", { job: job.id });
+      return this.record(job, "skipped", startedAt);
+    }
+    this.inProgress.add(job.id);
+
     const context = createRequestContext({ source: "job", operation: job.id }, startedAt);
 
     return runWithRequestContext(context, async () => {
@@ -124,6 +150,10 @@ export class JobScheduler {
       } catch (error) {
         this.logger.error("Job failed", { error, job: job.id });
         return this.record(job, "failed", startedAt);
+      } finally {
+        // Cleared even on failure, so one bad run does not stop the job for
+        // the life of the process.
+        this.inProgress.delete(job.id);
       }
     });
   }

@@ -91,4 +91,17 @@ export const say = {
     `You need \`${permission}\` to ${purpose}.`,
 
   belongsToSomeoneElse: (what: string): string => `That ${what} belongs to someone else.`,
+
+  // ── Faults ──────────────────────────────────────────────────────────────────────
+
+  /**
+   * The bot's fault, and the only sentence a fault ever shows.
+   *
+   * The code is the point: one string on the reply and on the log line, so a
+   * report can be looked up. Deliberately says nothing about retrying — the
+   * person cannot fix a fault, and "try again" sends them to do the one thing
+   * that will produce a second identical incident.
+   */
+  unexpected: (incident: string): string =>
+    `Something went wrong on our side. Quote error code \`${incident}\` when you report it.`,
 } as const;

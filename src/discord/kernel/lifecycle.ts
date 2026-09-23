@@ -4,7 +4,7 @@ import {
   createRequestContext,
   runWithRequestContext,
 } from "../../platform/context/request-context.js";
-import type { Logger } from "../../platform/logging/logger.contract.js";
+import { detach, type Logger } from "../../platform/logging/logger.contract.js";
 import { ConfigurationError, InfrastructureError } from "../../shared/errors/app-error.js";
 import { asSnowflake } from "../../shared/types/snowflake.types.js";
 import type { EventName, EventPayloads } from "../contracts/event.contract.js";
@@ -109,15 +109,13 @@ export function attachGateway(
   // rejections — wrong prefix, a bot author — happen before anything else. The
   // pipeline returns immediately when message commands are off.
   client.on(Events.MessageCreate, (message) => {
-    void pipeline.handleMessage(message).catch((error: unknown) => {
-      logger.error("Message pipeline threw", { error });
-    });
+    detach(pipeline.handleMessage(message), logger, "Message pipeline threw");
   });
 
   // Fires only when the Server Members intent was requested; discord.js simply
   // never receives the event otherwise, so no guard is needed here.
   client.on(Events.GuildMemberAdd, (member) => {
-    void dispatch(registry, logger, "memberJoined", {
+    detachDispatch(registry, logger, "memberJoined", {
       guildId: asSnowflake(member.guild.id),
       guildName: member.guild.name,
       userId: asSnowflake(member.id),
@@ -127,7 +125,7 @@ export function attachGateway(
   });
 
   client.on(Events.ChannelDelete, (channel) => {
-    void dispatch(registry, logger, "channelDeleted", {
+    detachDispatch(registry, logger, "channelDeleted", {
       guildId:
         "guildId" in channel && channel.guildId !== null ? asSnowflake(channel.guildId) : null,
       channelId: asSnowflake(channel.id),
@@ -135,7 +133,7 @@ export function attachGateway(
   });
 
   client.on(Events.GuildCreate, (guild) => {
-    void dispatch(registry, logger, "guildJoined", {
+    detachDispatch(registry, logger, "guildJoined", {
       guildId: asSnowflake(guild.id),
       name: guild.name,
       memberCount: guild.memberCount,
@@ -143,7 +141,7 @@ export function attachGateway(
   });
 
   client.on(Events.GuildDelete, (guild) => {
-    void dispatch(registry, logger, "guildLeft", { guildId: asSnowflake(guild.id) });
+    detachDispatch(registry, logger, "guildLeft", { guildId: asSnowflake(guild.id) });
   });
 
   client.on(Events.Error, (error) => {
@@ -162,6 +160,23 @@ export function attachGateway(
  * stop another's from running, and unlike an interaction there is nobody
  * waiting on a reply to inform.
  */
+/**
+ * Dispatches a gateway event without waiting for it, and says so if it fails.
+ *
+ * Every `client.on` handler is synchronous as far as discord.js is concerned,
+ * so the promise has to be let go somewhere. It goes through `detach` rather
+ * than a bare `void`, because a rejection nobody handles is fatal to the
+ * process — see platform/logging/logger.contract.ts.
+ */
+function detachDispatch<TName extends EventName>(
+  registry: InteractionRegistry,
+  logger: Logger,
+  event: TName,
+  payload: EventPayloads[TName],
+): void {
+  detach(dispatch(registry, logger, event, payload), logger, "Event dispatch failed", { event });
+}
+
 async function dispatch<TName extends EventName>(
   registry: InteractionRegistry,
   logger: Logger,

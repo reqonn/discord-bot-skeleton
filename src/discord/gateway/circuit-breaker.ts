@@ -53,6 +53,26 @@ export class CircuitBreaker {
     return true;
   }
 
+  /**
+   * Give back a probe slot that `allows` handed out but nothing ever used.
+   *
+   * `allows` marks the circuit as probing so that only one call goes through
+   * while half-open, and `recordSuccess`/`recordFailure` are what clear it.
+   * A probe that is admitted and then *not executed* — dropped by a full
+   * queue, or abandoned after waiting — reports neither, so without this the
+   * flag stays set and every later call is refused however long the cooldown
+   * has passed. The circuit never recovers, for that guild and feature, until
+   * the process restarts.
+   *
+   * Deliberately not a failure: nothing called Discord, so there is no
+   * evidence about whether the dependency is healthy. Recording one would
+   * restart the cooldown on the strength of our own queue being busy.
+   */
+  releaseProbe(key: string): void {
+    const circuit = this.circuits.get(key);
+    if (circuit !== undefined) circuit.probing = false;
+  }
+
   state(key: string): CircuitState {
     const circuit = this.circuits.get(key);
     if (circuit === undefined || circuit.openedAt === undefined) return "closed";

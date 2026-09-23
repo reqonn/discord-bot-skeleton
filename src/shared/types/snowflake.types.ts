@@ -14,10 +14,6 @@ export type Snowflake = Brand<string, "Snowflake">;
 /** Discord snowflakes are 17–20 digit decimal strings. */
 const SNOWFLAKE_PATTERN = /^\d{17,20}$/;
 
-export function isSnowflake(value: unknown): value is Snowflake {
-  return typeof value === "string" && SNOWFLAKE_PATTERN.test(value);
-}
-
 /**
  * Asserts at a trust boundary that a string really is a snowflake.
  * Use when accepting ids from user input or an external system — never to

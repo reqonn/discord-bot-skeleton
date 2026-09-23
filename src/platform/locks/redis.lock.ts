@@ -2,12 +2,21 @@ import { randomUUID } from "node:crypto";
 
 import type { Redis } from "ioredis";
 
-import type { Logger } from "../logging/logger.contract.js";
+import { detach, type Logger } from "../logging/logger.contract.js";
 
 import type { Lock } from "./lock.contract.js";
 
 /** Renew at a third of the TTL, so two renewals may fail before the lease lapses. */
 const RENEW_FRACTION = 3;
+
+/**
+ * The floor on the renewal interval.
+ *
+ * `ttlMs / 3` floors to 0 for a short lease, and `setInterval(fn, 0)` is a
+ * tight loop — which turns a lock into a denial of service against the Redis
+ * it depends on, at exactly the moment the lease is most contended.
+ */
+const MIN_RENEW_INTERVAL_MS = 1_000;
 
 /**
  * Extends the lease only if we still hold it.
@@ -60,16 +69,38 @@ export class RedisLock implements Lock {
     const key = `lock:${name}`;
     const token = randomUUID();
 
-    const acquired = await this.redis.set(key, token, "PX", ttlMs, "NX");
+    let acquired: string | null;
+    try {
+      acquired = await this.redis.set(key, token, "PX", ttlMs, "NX");
+    } catch (error) {
+      // Fail closed, and quietly. An unreachable Redis is not a bug in the
+      // job, so raising it here reports the job as failed and sends whoever is
+      // on call looking at the wrong thing. It must also never be read as
+      // "nobody holds it" — that would let every instance run a singleton at
+      // once, which is the outcome this whole mechanism exists to prevent.
+      this.logger.warn("Could not reach Redis to take a lease", { error, lock: name });
+      return undefined;
+    }
+
     if (acquired === null) return undefined;
 
     const controller = new AbortController();
     const renewal = setInterval(
       () => {
-        void this.renew(key, token, ttlMs, name, controller);
+        detach(
+          this.renew(key, token, ttlMs, name, controller),
+          this.logger,
+          "Could not renew a lease",
+          { lock: name },
+        );
       },
-      Math.floor(ttlMs / RENEW_FRACTION),
+      Math.max(MIN_RENEW_INTERVAL_MS, Math.floor(ttlMs / RENEW_FRACTION)),
     );
+
+    // Renewing a lease is never a reason to keep a shutting-down process
+    // alive. Without this, work that hangs holds the event loop open through
+    // its own renewal timer and the process never exits on its own.
+    renewal.unref();
 
     try {
       return await work(controller.signal);

@@ -16,7 +16,7 @@ import type { Logger } from "../../platform/logging/logger.contract.js";
 import { Metric } from "../../platform/metrics/metrics.catalog.js";
 import type { Metrics } from "../../platform/metrics/metrics.contract.js";
 import type { CooldownStore } from "../../platform/ratelimit/cooldown.contract.js";
-import { AuthorizationError, type AppError } from "../../shared/errors/app-error.js";
+import { AuthorizationError } from "../../shared/errors/app-error.js";
 import { asSnowflake } from "../../shared/types/snowflake.types.js";
 import type { AuthorizationPolicy } from "../contracts/authorization.contract.js";
 import type { CooldownSpec } from "../contracts/command.contract.js";
@@ -25,6 +25,7 @@ import { parseCustomId } from "../contracts/custom-id.js";
 import type { Response } from "../contracts/response.contract.js";
 
 import { handleAutocomplete } from "./autocomplete.handler.js";
+import { recordCompletion } from "./completion-log.js";
 import {
   buildCommandContext,
   buildComponentContext,
@@ -34,7 +35,8 @@ import {
   type Responder,
 } from "./context-factory.js";
 import { AUTO_DEFER_AFTER_MS, planDeferral, TYPING_AFTER_MS } from "./defer-policy.js";
-import { isGone, isWorthReporting, toAppError } from "./error-mapper.js";
+import { isWorthReporting } from "./error-mapper.js";
+import { reportFailure } from "./failure-reporting.js";
 import { enforceAuthorization, enforceCooldown } from "./guards.js";
 import { buildMessageContext, MessageResponder } from "./message-context.js";
 import { parseMessageCommand, readMessageOptions } from "./message-parser.js";
@@ -387,75 +389,28 @@ export class InteractionPipeline {
       );
 
       if (deferTimer !== undefined) clearTimeout(deferTimer);
-      await step.responder.respond(response);
+
+      if (response.kind === "error" && isWorthReporting(response.error)) {
+        // A handler returned a fault as a Response rather than throwing it.
+        // Every failure is decided once, so it takes the same path and gets
+        // the same incident code as one that was thrown.
+        outcome = await reportFailure(this.deps, response.error, {
+          operation: step.context.operation,
+          responder: step.responder,
+        });
+      } else {
+        await step.responder.respond(response);
+      }
     } catch (error) {
       if (deferTimer !== undefined) clearTimeout(deferTimer);
-      outcome = (await this.reportFailure(error, step.responder, step.context)) as typeof outcome;
+      outcome = await reportFailure(this.deps, error, {
+        operation: step.context.operation,
+        responder: step.responder,
+      });
     } finally {
       if (deferTimer !== undefined) clearTimeout(deferTimer);
-      this.recordCompletion(step.context, outcome);
+      recordCompletion(this.deps, step.context, outcome);
     }
-  }
-
-  /** Renders the failure and returns the outcome label for metrics. */
-  private async reportFailure(
-    error: unknown,
-    responder: Responder,
-    context: RequestContext,
-  ): Promise<string> {
-    if (isGone(error)) {
-      // The interaction or its target vanished. There is nobody left to tell.
-      this.deps.logger.debug("Interaction target no longer exists", {
-        operation: context.operation,
-      });
-      return "expected_error";
-    }
-
-    const appError: AppError = toAppError(error);
-
-    if (isWorthReporting(appError)) {
-      this.deps.logger.error("Interaction failed", {
-        error: appError,
-        operation: context.operation,
-      });
-    } else {
-      this.deps.logger.info("Interaction rejected", {
-        operation: context.operation,
-        code: appError.code,
-      });
-    }
-
-    try {
-      await responder.respond({ kind: "error", error: appError });
-    } catch (replyError) {
-      // Failing to deliver the error is not worth a second error; the original
-      // is already recorded.
-      this.deps.logger.warn("Could not deliver the error response", { error: replyError });
-    }
-
-    return isWorthReporting(appError) ? "unexpected_error" : "expected_error";
-  }
-
-  private recordCompletion(context: RequestContext, outcome: string): void {
-    const durationMs = Date.now() - context.startedAt;
-    const labels = { operation: context.operation, outcome };
-
-    this.deps.metrics.increment(Metric.commandTotal, labels);
-    this.deps.metrics.observe(Metric.commandAckDurationMs, durationMs, {
-      operation: context.operation,
-    });
-    this.deps.metrics.observe(Metric.commandQueriesPerRequest, context.counters.queries, {
-      operation: context.operation,
-    });
-
-    this.deps.logger.debug("Interaction complete", {
-      durationMs,
-      outcome,
-      queries: context.counters.queries,
-      queryMs: Math.round(context.counters.queryDurationMs),
-      cacheHits: context.counters.cacheHits,
-      cacheMisses: context.counters.cacheMisses,
-    });
   }
 
   private async replyUnknown(interaction: AnyRepliableInteraction, message: string): Promise<void> {
