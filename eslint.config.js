@@ -31,6 +31,20 @@ export default tseslint.config(
 
   js.configs.recommended,
 
+  // The agent hooks in `.claude/hooks/` are plain Node scripts: they read a tool
+  // call on stdin and answer with an exit code. Linted like everything else,
+  // because they are two rules the harness enforces rather than trusts and a
+  // typo in one is a guard that silently stops guarding. But they run under
+  // Node rather than in the bot, so they get Node's globals and not the
+  // type-aware rules, which need a TS program they are not part of.
+  {
+    files: [".claude/hooks/*.mjs"],
+    languageOptions: {
+      globals: { process: "readonly", console: "readonly" },
+      sourceType: "module",
+    },
+  },
+
   // Type-aware rules only apply to TypeScript sources. Config files such as
   // this one are plain JS and are not part of the TS program, so applying
   // type-checked rules to them fails at load time.

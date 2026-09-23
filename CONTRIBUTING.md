@@ -20,7 +20,7 @@ and it must never weaken a check to make a change pass.
 
 ## Setup
 
-Requires **Node 22+** and **pnpm**. Docker is optional.
+Requires **Node 24+** and **pnpm**. Docker is optional.
 
 ```bash
 pnpm install

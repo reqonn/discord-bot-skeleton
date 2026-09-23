@@ -285,7 +285,10 @@ describe("architecture", () => {
           (file) =>
             !file.path.startsWith("tests/architecture/") &&
             !file.path.startsWith("tests/support/") &&
-            !file.path.startsWith("tests/integration/"),
+            !file.path.startsWith("tests/integration/") &&
+            // Tests of the repository's own tooling — the agent hooks in
+            // .claude/hooks/ — have no twin under src/ by design.
+            !file.path.startsWith("tests/tooling/"),
         )
         .map((file) => ({
           test: file.path,

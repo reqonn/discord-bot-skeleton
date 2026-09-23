@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A Discord bot skeleton \u2014 Node.js, TypeScript, discord.js \u2014 on a feature-sliced hexagonal architecture",
+  "description": "A Discord bot skeleton — Node.js, TypeScript, discord.js — on a feature-sliced hexagonal architecture",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "packageManager": "pnpm@11.21.0",
   "imports": {
@@ -36,7 +36,7 @@
     "dev": "tsx watch --conditions=development --env-file-if-exists=.env src/main.ts",
     "stop": "tsx --conditions=development scripts/stop.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node --env-file-if-exists=.env dist/main.js",
+    "start": "node dist/main.js",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm arch && pnpm test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -71,7 +71,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.2.0",
+    "@types/node": "^24.13.6",
     "@types/pg": "^8.21.0",
     "@vitest/coverage-v8": "^4.1.10",
     "dependency-cruiser": "^18.2.0",

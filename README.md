@@ -21,7 +21,7 @@ enforced by tooling rather than by discipline.
 
 ## Quick start
 
-Requires **Node 22+** and **pnpm**. Nothing else — no Docker, no Redis.
+Requires **Node 24+** and **pnpm**. Nothing else — no Docker, no Redis.
 
 ```bash
 pnpm install
@@ -173,7 +173,7 @@ applies to the platform as much as to features.
 
 |                       | Role          | Why this one                                                             |
 | --------------------- | ------------- | ------------------------------------------------------------------------ |
-| **Node.js 22+**       | Runtime       | LTS, native ESM, built-in `--env-file`                                   |
+| **Node.js 24+**       | Runtime       | LTS, native ESM, built-in `--env-file`                                   |
 | **TypeScript 6**      | Language      | Strict, with `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess` |
 | **discord.js 14**     | Discord API   | Confined to one directory, so it can be upgraded or replaced             |
 | **PostgreSQL** (`pg`) | Database      | Raw parameterized SQL behind repository interfaces — no ORM              |

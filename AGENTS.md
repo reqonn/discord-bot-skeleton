@@ -8,12 +8,25 @@ Zed, and most other agents. Keep it short — it is loaded into every context.
 
 ---
 
-## The rule that matters most
+## The five rules
 
-**Run `pnpm verify` before you say you are done.** It runs typecheck, lint,
-architecture rules, and the full test suite — the same thing CI runs.
-
-If it fails, **fix the code**. The harness is the specification.
+1. **`pnpm verify` before you say anything is done.** Typecheck, lint,
+   format, depcruise, tests — the same thing CI runs. Not "it should be fine":
+   run it. If it fails, **fix the code**. The harness is the specification.
+2. **Search before you invent.** Almost every mistake worth having a gate for
+   was a second version of something that already existed. If it feels like
+   plumbing — parsing, replying, a permission check, a placeholder, a sentence
+   the bot says — it exists; find it rather than adding a rival.
+3. **Make it fail first.** Break the thing, watch the test go red, fix it,
+   watch it go green. A fix you have not seen fail is a fix you have not
+   verified — two correct-looking fixes for one race shipped a week apart and
+   both were inert, because the test awaited a card the pipeline fires
+   unawaited.
+4. **Stage by name.** Never `git add -A`, `.`, `-u` or `git commit -a`; a
+   working tree may hold somebody else's half-finished edit. A hook in
+   `.claude/settings.json` refuses it however it is spelled.
+5. **Say what actually happened.** Tests failed, a step was skipped, a suite
+   printed "skipped: no database" — say so. Silence about a gap reads as a pass.
 
 ---
 
@@ -37,6 +50,11 @@ they are the ones an agent is most likely to reach for when blocked:
 - **Never write a second way to do something the pipeline already does** —
   parsing a message, replying, checking a permission, rendering an embed. If it
   feels like plumbing, it already exists; find it rather than adding a rival.
+- **Never let a promise go with a bare `void`.** What `void` lets go of is
+  the _failure_: a rejection nobody handles is fatal to the process. Use
+  `detach(work, logger, "what was being done")` from
+  `#platform/logging/logger.contract.js`, which logs it with what it was doing.
+  A gate (`background-work`) refuses the bare form.
 - **Never stringify an error to log it.** Pass it whole — `logger.warn("could
 not renew the lease", { error })`. The port serialises it at every level, with
   its cause chain, and scrubs credentials out of the message. `String(error)`
@@ -151,6 +169,43 @@ Full list with examples: [docs/architecture.md § 4](docs/architecture.md#4-the-
 
 ---
 
+## Failures
+
+Every failure is decided once, where it is created.
+
+- **A refusal** is the person's to fix — bad input, a missing permission, a
+  limit. A named `DomainError` whose sentence names what to change, composed
+  from `say.*`. Logged at info. Shown as written.
+- **A fault** is the database, Discord, the network or the bot. An unexpected
+  `AppError`; thrown or returned, the pipeline logs it with an **incident code**
+  and shows only that code (`say.unexpected`). The error's own `userMessage`
+  reaches the logs and nobody else.
+
+So: never flatten a failure into `false`, `null`, `[]` or `0` ("Purged 0
+messages" for an outage); never write "Please try again" (`refusal-wording`
+refuses it); never `void` a promise.
+
+---
+
+## The defect shapes to look for
+
+Each of these shipped at least once in the production bot this skeleton comes
+from. Most now have a gate; see `docs/gates.md`.
+
+- **Wired but never called.** Written, exported, documented, covered by a
+  test, called by nothing. The most common one by far. `dead-exports` holds it
+  for exports; nothing holds it for a method inside an object, so read for it.
+- **A graceful fallback hiding its own failure.** The degraded path looks like
+  a design choice. If a lookup misses, say so; if Discord failed, it is a fault.
+- **One question, two answers.** A check the UI makes before an action and the
+  action's own guard must be **one function**, called twice.
+- **A token that is correct but not rendered.** Assert on the _drawn_ output,
+  not on the data behind it.
+- **A test that cannot fail.** A gate whose walk found nothing passes silently.
+  Every gate here carries a canary asserting it read something.
+
+---
+
 ## When a rule blocks you
 
 This is the moment the codebase is most likely to be damaged, so it has its own
@@ -180,3 +235,5 @@ Work through it in this order.
       once a second test does
 - [ ] New env vars are in the schema _and_ `.env.example` (a test checks both)
 - [ ] Comments explain **why**, not what
+- [ ] You watched the new test fail before you made it pass
+- [ ] You staged the files you touched, by name
