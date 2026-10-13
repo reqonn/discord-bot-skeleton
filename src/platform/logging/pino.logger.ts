@@ -109,8 +109,17 @@ export function createLogger(config: Config, destination?: DestinationStream): L
     redact: { paths: REDACTED_PATHS, censor: "[redacted]" },
   } satisfies LoggerOptions;
 
+  // The level as its word, wherever the record is JSON. Pino writes a number
+  // and a host's log viewer reads a word, so every line was shown as `info` —
+  // a crash the same colour as a routine sync, and a search for errors finding
+  // none. Not with the pretty transport, which reads the number to colour it.
+  const json = {
+    ...options,
+    formatters: { level: (label: string) => ({ level: label }) },
+  } satisfies LoggerOptions;
+
   if (destination !== undefined) {
-    return new PinoLoggerAdapter(pino(options, destination));
+    return new PinoLoggerAdapter(pino(json, destination));
   }
 
   if (config.profile.prettyLogs) {
@@ -130,5 +139,5 @@ export function createLogger(config: Config, destination?: DestinationStream): L
     );
   }
 
-  return new PinoLoggerAdapter(pino(options));
+  return new PinoLoggerAdapter(pino(json));
 }

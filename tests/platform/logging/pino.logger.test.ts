@@ -55,6 +55,20 @@ describe("createLogger", () => {
     expect(records.map((r) => r["msg"])).toEqual(["a", "b", "c", "d", "e", "f"]);
   });
 
+  /**
+   * The level as its word. Pino writes a number — 30, 40, 50 — and a host's log
+   * viewer reads a word, so every line arrived as `info`: a command that
+   * crashed five times in ten minutes was the same colour as a routine sync,
+   * and a search for errors found none.
+   */
+  it("writes the level as the word a log viewer reads", () => {
+    log.info("starting");
+    log.warn("slow");
+    log.error("failed");
+
+    expect(records.map((r) => r["level"])).toEqual(["info", "warn", "error"]);
+  });
+
   describe("request context", () => {
     it("attaches correlation fields with no call-site involvement", () => {
       // The point of the ambient context: this call passes no ids, and the
